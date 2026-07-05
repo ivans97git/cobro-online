@@ -101,6 +101,65 @@ app.use((req, res, next) => {
 });
 
 // ============================================
+// 🔥 FUNCIÓN PARA FORZAR USUARIOS (NUEVO)
+// ============================================
+async function forceCreateUsers() {
+    try {
+        console.log('🔍 Verificando usuarios en la base de datos...');
+        
+        // Verificar si la tabla existe
+        const tableExists = await db.get(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='usuarios'"
+        );
+        
+        if (!tableExists) {
+            console.log('❌ Tabla "usuarios" no encontrada. Creando...');
+            await db.exec(`
+                CREATE TABLE IF NOT EXISTS usuarios (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    nombre TEXT NOT NULL,
+                    email TEXT UNIQUE NOT NULL,
+                    password TEXT NOT NULL,
+                    codigo_cobrador TEXT UNIQUE NOT NULL,
+                    activo INTEGER DEFAULT 1,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                )
+            `);
+        }
+
+        // Verificar si hay usuarios
+        const count = await db.get('SELECT COUNT(*) as count FROM usuarios');
+        console.log(`📊 Usuarios en la base de datos: ${count.count}`);
+
+        if (count.count === 0) {
+            console.log('👤 Creando usuarios de prueba...');
+            await db.run(`
+                INSERT INTO usuarios (nombre, email, password, codigo_cobrador) VALUES
+                ('Carlos Pérez', 'carlos@cobro.com', '$2a$10$9C5VqZqZqZqZqZqZqZqZqO', 'CBR001'),
+                ('María Gómez', 'maria@cobro.com', '$2a$10$9C5VqZqZqZqZqZqZqZqZqO', 'CBR002'),
+                ('Juan Rodríguez', 'juan@cobro.com', '$2a$10$9C5VqZqZqZqZqZqZqZqZqO', 'CBR003'),
+                ('Ana Martínez', 'ana@cobro.com', '$2a$10$9C5VqZqZqZqZqZqZqZqZqO', 'CBR004'),
+                ('Luis Sánchez', 'luis@cobro.com', '$2a$10$9C5VqZqZqZqZqZqZqZqZqO', 'CBR005'),
+                ('Elena Torres', 'elena@cobro.com', '$2a$10$9C5VqZqZqZqZqZqZqZqZqO', 'CBR006')
+            `);
+            console.log('✅ 6 usuarios de prueba creados');
+            
+            // Verificar que se crearon
+            const usuarios = await db.all('SELECT codigo_cobrador, nombre FROM usuarios');
+            console.log('📊 Usuarios creados:');
+            usuarios.forEach(u => console.log(`   ${u.codigo_cobrador}: ${u.nombre}`));
+        } else {
+            console.log('✅ Usuarios ya existen');
+            const usuarios = await db.all('SELECT codigo_cobrador, nombre FROM usuarios');
+            console.log('📊 Usuarios en la base de datos:');
+            usuarios.forEach(u => console.log(`   ${u.codigo_cobrador}: ${u.nombre}`));
+        }
+    } catch (error) {
+        console.error('❌ Error forzando usuarios:', error.message);
+    }
+}
+
+// ============================================
 // 5. RUTAS DE AUTENTICACIÓN
 // ============================================
 
@@ -373,7 +432,10 @@ app.get('/api/health', (req, res) => {
 // ============================================
 // 9. INICIAR SERVIDOR
 // ============================================
-initDatabase().then(() => {
+initDatabase().then(async () => {
+    // 🔥 FORZAR CREACIÓN DE USUARIOS
+    await forceCreateUsers();
+    
     app.listen(PORT, () => {
         console.log('\n' + '='.repeat(50));
         console.log('🚀 SERVIDOR INICIADO CORRECTAMENTE');

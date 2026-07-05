@@ -185,25 +185,42 @@ app.post('/api/auth/login', async (req, res) => {
     try {
         const { codigo, password } = req.body;
 
+        // 🔥 LOG 1: Ver qué datos llegan
+        console.log('📥 Datos recibidos:', { codigo, password });
+
         if (!codigo || !password) {
+            console.log('❌ Faltan datos');
             return res.status(400).json({ 
                 error: '❌ Código de cobrador y contraseña son requeridos' 
             });
         }
 
+        // 🔥 LOG 2: Buscar usuario
+        console.log(`🔍 Buscando usuario con código: ${codigo}`);
         const user = await db.get(
             'SELECT * FROM usuarios WHERE codigo_cobrador = ? AND activo = 1',
             [codigo]
         );
 
         if (!user) {
+            console.log(`❌ Usuario no encontrado: ${codigo}`);
             return res.status(401).json({ error: '❌ Credenciales inválidas' });
         }
 
+        console.log(`✅ Usuario encontrado: ${user.nombre} (${user.codigo_cobrador})`);
+        console.log(`🔑 Hash almacenado: ${user.password.substring(0, 20)}...`);
+
+        // 🔥 LOG 3: Verificar contraseña
+        console.log(`🔐 Comparando contraseña...`);
         const passwordValida = await bcrypt.compare(password, user.password);
+        console.log(`📊 Resultado de comparación: ${passwordValida ? '✅ VÁLIDA' : '❌ INVÁLIDA'}`);
+
         if (!passwordValida) {
+            console.log(`❌ Contraseña incorrecta para: ${codigo}`);
             return res.status(401).json({ error: '❌ Credenciales inválidas' });
         }
+
+        console.log(`✅ Login exitoso para: ${user.nombre}`);
 
         const token = jwt.sign(
             { 
@@ -227,7 +244,7 @@ app.post('/api/auth/login', async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Error en login:', error);
+        console.error('❌ Error en login:', error);
         res.status(500).json({ error: '❌ Error en el servidor' });
     }
 });

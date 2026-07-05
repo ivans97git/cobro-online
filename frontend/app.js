@@ -4,6 +4,7 @@
 const API_URL = window.location.origin;
 let token = localStorage.getItem('token');
 let currentUser = null;
+let currentTab = 'clientes';
 
 // ============================================
 // VERIFICAR AUTENTICACIÓN
@@ -16,16 +17,19 @@ async function checkAuth() {
 
     try {
         const response = await fetch(`${API_URL}/api/auth/verify`, {
-            headers: {
-                'Authorization': `Bearer ${token}`
-            }
+            headers: { 'Authorization': `Bearer ${token}` }
         });
 
         if (response.ok) {
             const data = await response.json();
             currentUser = data.user;
             showDashboard();
-            await loadDashboardData();
+            await Promise.all([
+                loadClientes(),
+                loadPlanes(),
+                loadMorosos()
+            ]);
+            await cargarClientesEnSelect();
         } else {
             localStorage.removeItem('token');
             token = null;
@@ -38,7 +42,29 @@ async function checkAuth() {
 }
 
 // ============================================
-// MOSTRAR/OCULTAR SECCIONES
+// NAVEGACIÓN POR TABS
+// ============================================
+document.querySelectorAll('.nav-tab').forEach(tab => {
+    tab.addEventListener('click', function() {
+        // Cambiar tab activa
+        document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+        this.classList.add('active');
+        
+        // Cambiar contenido
+        const tabName = this.dataset.tab;
+        document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+        document.getElementById(`tab-${tabName}`).classList.add('active');
+        
+        // Cargar datos según tab
+        if (tabName === 'clientes') loadClientes();
+        if (tabName === 'morosos') loadMorosos();
+        if (tabName === 'planes') loadPlanes();
+        if (tabName === 'pagos') cargarClientesEnSelect();
+    });
+});
+
+// ============================================
+// FUNCIONES DE CARGA
 // ============================================
 function showLogin() {
     document.getElementById('loginSection').style.display = 'block';
@@ -53,106 +79,258 @@ function showDashboard() {
 }
 
 // ============================================
-// CARGAR DATOS DEL DASHBOARD
+// CARGAR CLIENTES
 // ============================================
-async function loadDashboardData() {
-    await Promise.all([
-        loadStats(),
-        loadCobros()
-    ]);
-}
-
-// ============================================
-// CARGAR ESTADÍSTICAS
-// ============================================
-async function loadStats() {
+async function loadClientes() {
     try {
-        const response = await fetch(`${API_URL}/api/cobros/estadisticas`, {
-            headers: {
-                'Authorization': `Bearer ${token}`
-            }
+        const response = await fetch(`${API_URL}/api/clientes`, {
+            headers: { 'Authorization': `Bearer ${token}` }
         });
 
         if (response.ok) {
-            const data = await response.json();
+            const clientes = await response.json();
+            const tbody = document.getElementById('clientesTableBody');
             
-            document.getElementById('totalCobros').textContent = data.total.total_cobros || 0;
-            document.getElementById('montoTotal').textContent = `$${parseFloat(data.total.monto_total || 0).toFixed(2)}`;
-            document.getElementById('promedio').textContent = `$${parseFloat(data.total.promedio || 0).toFixed(2)}`;
-            document.getElementById('clientesUnicos').textContent = data.total.clientes_unicos || 0;
-
-            const detalleDiv = document.getElementById('metodosDetalle');
-            detalleDiv.innerHTML = '';
-            
-            if (data.por_metodo && data.por_metodo.length > 0) {
-                data.por_metodo.forEach(item => {
-                    const div = document.createElement('div');
-                    div.className = 'stat-item';
-                    div.innerHTML = `
-                        <span>${item.metodo_pago}:</span>
-                        <span>${item.cantidad} - $${parseFloat(item.total).toFixed(2)}</span>
-                    `;
-                    detalleDiv.appendChild(div);
-                });
-            } else {
-                detalleDiv.innerHTML = '<p style="color:#9ca3af; font-size:14px;">No hay datos</p>';
+            if (clientes.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;">No hay clientes registrados</td></tr>';
+                return;
             }
+
+            tbody.innerHTML = clientes.map(c => `
+                <tr>
+                    <td><strong>${c.nombre}</strong></td>
+                    <td>${c.telefono}</td>
+                    <td>${c.plan_nombre || 'Sin plan'} (${c.velocidad || ''})</td>
+                    <td>${c.fecha_instalacion || '-'}</td>
+                    <td><span class="badge" style="background:${c.activo ? '#10b981' : '#ef4444'}">${c.activo ? 'Activo' : 'Inactivo'}</span></td>
+                </tr>
+            `).join('');
         }
     } catch (error) {
-        console.error('Error cargando estadísticas:', error);
+        console.error('Error cargando clientes:', error);
     }
 }
 
 // ============================================
-// CARGAR HISTORIAL DE COBROS
+// CARGAR PLANES
 // ============================================
-async function loadCobros() {
+async function loadPlanes() {
     try {
-        const response = await fetch(`${API_URL}/api/cobros/mis-cobros`, {
-            headers: {
-                'Authorization': `Bearer ${token}`
-            }
+        const response = await fetch(`${API_URL}/api/planes`, {
+            headers: { 'Authorization': `Bearer ${token}` }
         });
 
         if (response.ok) {
-            const cobros = await response.json();
-            const tbody = document.getElementById('cobrosTableBody');
+            const planes = await response.json();
+            const tbody = document.getElementById('planesTableBody');
             
-            if (cobros.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:#9ca3af;">No hay cobros registrados</td></tr>';
+            if (planes.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">No hay planes configurados</td></tr>';
                 return;
             }
 
-            const estadoColors = {
-                'completado': '#10b981',
-                'pendiente': '#f59e0b',
-                'cancelado': '#ef4444'
-            };
-
-            tbody.innerHTML = cobros.map(cobro => `
+            tbody.innerHTML = planes.map(p => `
                 <tr>
-                    <td>${new Date(cobro.fecha_cobro).toLocaleString('es-ES')}</td>
-                    <td><strong>${cobro.cliente_nombre}</strong></td>
-                    <td>$${parseFloat(cobro.monto).toFixed(2)}</td>
-                    <td>${cobro.metodo_pago}</td>
-                    <td>${cobro.concepto || '-'}</td>
+                    <td><strong>${p.nombre}</strong></td>
+                    <td>${p.velocidad}</td>
+                    <td>$${p.precio.toLocaleString()}</td>
+                    <td>${p.descripcion || '-'}</td>
+                </tr>
+            `).join('');
+        }
+    } catch (error) {
+        console.error('Error cargando planes:', error);
+    }
+}
+
+// ============================================
+// CARGAR MOROSOS
+// ============================================
+async function loadMorosos() {
+    try {
+        const response = await fetch(`${API_URL}/api/morosos`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (response.ok) {
+            const morosos = await response.json();
+            const tbody = document.getElementById('morososTableBody');
+            
+            if (morosos.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">🎉 No hay clientes morosos</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = morosos.map(m => `
+                <tr>
+                    <td><strong>${m.nombre}</strong></td>
+                    <td>${m.telefono}</td>
+                    <td>${m.plan_nombre || 'Sin plan'}</td>
+                    <td>${m.meses_deuda?.length || 0} meses</td>
+                    <td>$${m.total_deuda?.toLocaleString() || 0}</td>
                     <td>
-                        <span style="
-                            background: ${estadoColors[cobro.estado] || '#6b7280'};
-                            color: white;
-                            padding: 3px 12px;
-                            border-radius: 20px;
-                            font-size: 12px;
-                            font-weight: 600;
-                        ">${cobro.estado}</span>
+                        <button class="btn-whatsapp" onclick="enviarWhatsApp(${m.id})">📱 WhatsApp</button>
                     </td>
                 </tr>
             `).join('');
         }
     } catch (error) {
-        console.error('Error cargando cobros:', error);
+        console.error('Error cargando morosos:', error);
     }
 }
+
+// ============================================
+// CARGAR CLIENTES EN SELECT
+// ============================================
+async function cargarClientesEnSelect() {
+    try {
+        const response = await fetch(`${API_URL}/api/clientes`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (response.ok) {
+            const clientes = await response.json();
+            const select = document.getElementById('clientePago');
+            
+            select.innerHTML = '<option value="">Seleccionar cliente...</option>';
+            clientes.forEach(c => {
+                select.innerHTML += `<option value="${c.id}">${c.nombre} - ${c.plan_nombre || 'Sin plan'}</option>`;
+            });
+        }
+    } catch (error) {
+        console.error('Error cargando clientes en select:', error);
+    }
+}
+
+// ============================================
+// REGISTRAR PAGO
+// ============================================
+document.getElementById('pagoForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const cliente_id = document.getElementById('clientePago').value;
+    const mes = document.getElementById('mesPago').value;
+    const anio = document.getElementById('anioPago').value;
+    const monto = document.getElementById('montoPago').value;
+    const metodo_pago = document.getElementById('metodoPagoPago').value;
+
+    const messageDiv = document.getElementById('pagoMessage');
+    messageDiv.textContent = '';
+    messageDiv.className = 'message';
+
+    if (!cliente_id) {
+        messageDiv.textContent = '❌ Seleccione un cliente';
+        messageDiv.className = 'message error';
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_URL}/api/pagos`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+                cliente_id: parseInt(cliente_id),
+                mes: parseInt(mes),
+                anio: parseInt(anio),
+                monto: parseFloat(monto),
+                metodo_pago
+            })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            messageDiv.textContent = data.error || '❌ Error al registrar pago';
+            messageDiv.className = 'message error';
+            return;
+        }
+
+        messageDiv.textContent = '✅ Pago registrado exitosamente';
+        messageDiv.className = 'message success';
+        
+        document.getElementById('pagoForm').reset();
+        await loadMorosos();
+        await loadClientes();
+
+        setTimeout(() => {
+            messageDiv.textContent = '';
+            messageDiv.className = 'message';
+        }, 3000);
+
+    } catch (error) {
+        messageDiv.textContent = '❌ Error de conexión con el servidor';
+        messageDiv.className = 'message error';
+        console.error('Error registrando pago:', error);
+    }
+});
+
+// ============================================
+// ENVIAR WHATSAPP A UN MOROSO
+// ============================================
+async function enviarWhatsApp(clienteId) {
+    if (!confirm('¿Enviar recordatorio de pago por WhatsApp?')) return;
+
+    try {
+        const response = await fetch(`${API_URL}/api/enviar-whatsapp/${clienteId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+                mes: new Date().getMonth() + 1,
+                anio: new Date().getFullYear()
+            })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            alert('❌ Error: ' + (data.error || 'No se pudo enviar el mensaje'));
+            return;
+        }
+
+        alert('✅ Mensaje enviado exitosamente a ' + data.cliente);
+        await loadMorosos();
+
+    } catch (error) {
+        console.error('Error enviando WhatsApp:', error);
+        alert('❌ Error de conexión con el servidor');
+    }
+}
+
+// ============================================
+// ENVIAR A TODOS LOS MOROSOS
+// ============================================
+document.getElementById('btnEnviarTodos').addEventListener('click', async () => {
+    if (!confirm('¿Enviar recordatorios a TODOS los clientes morosos?')) return;
+
+    try {
+        const response = await fetch(`${API_URL}/api/enviar-recordatorios-masivos`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            alert('❌ Error: ' + (data.error || 'No se pudo enviar los mensajes'));
+            return;
+        }
+
+        alert(`✅ ${data.message}`);
+        await loadMorosos();
+
+    } catch (error) {
+        console.error('Error enviando recordatorios masivos:', error);
+        alert('❌ Error de conexión con el servidor');
+    }
+});
 
 // ============================================
 // EVENTO: LOGIN
@@ -165,12 +343,6 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
     const errorDiv = document.getElementById('loginError');
     
     errorDiv.textContent = '';
-    errorDiv.className = 'error-message';
-
-    if (!codigo || !password) {
-        errorDiv.textContent = '❌ Por favor complete todos los campos';
-        return;
-    }
 
     try {
         const response = await fetch(`${API_URL}/api/auth/login`, {
@@ -191,84 +363,17 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
         localStorage.setItem('token', token);
         
         showDashboard();
-        await loadDashboardData();
+        await Promise.all([
+            loadClientes(),
+            loadPlanes(),
+            loadMorosos()
+        ]);
+        await cargarClientesEnSelect();
         document.getElementById('loginForm').reset();
 
     } catch (error) {
         errorDiv.textContent = '❌ Error de conexión con el servidor';
         console.error('Error en login:', error);
-    }
-});
-
-// ============================================
-// EVENTO: REGISTRAR COBRO
-// ============================================
-document.getElementById('cobroForm').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    
-    const cobroData = {
-        cliente_nombre: document.getElementById('clienteNombre').value.trim(),
-        cliente_cedula: document.getElementById('clienteCedula').value.trim(),
-        monto: parseFloat(document.getElementById('monto').value),
-        concepto: document.getElementById('concepto').value.trim(),
-        metodo_pago: document.getElementById('metodoPago').value,
-        referencia: document.getElementById('referencia').value.trim()
-    };
-
-    const messageDiv = document.getElementById('cobroMessage');
-    messageDiv.textContent = '';
-    messageDiv.className = 'message';
-
-    if (!cobroData.cliente_nombre) {
-        messageDiv.textContent = '❌ El nombre del cliente es requerido';
-        messageDiv.className = 'message error';
-        return;
-    }
-
-    if (isNaN(cobroData.monto) || cobroData.monto <= 0) {
-        messageDiv.textContent = '❌ Ingrese un monto válido mayor a 0';
-        messageDiv.className = 'message error';
-        return;
-    }
-
-    try {
-        const response = await fetch(`${API_URL}/api/cobros/registrar`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify(cobroData)
-        });
-
-        const data = await response.json();
-
-        if (!response.ok) {
-            messageDiv.textContent = data.error || '❌ Error al registrar cobro';
-            messageDiv.className = 'message error';
-            return;
-        }
-
-        messageDiv.textContent = '✅ Cobro registrado exitosamente';
-        messageDiv.className = 'message success';
-        
-        document.getElementById('clienteNombre').value = '';
-        document.getElementById('clienteCedula').value = '';
-        document.getElementById('monto').value = '';
-        document.getElementById('concepto').value = '';
-        document.getElementById('referencia').value = '';
-        
-        await loadDashboardData();
-
-        setTimeout(() => {
-            messageDiv.textContent = '';
-            messageDiv.className = 'message';
-        }, 3000);
-
-    } catch (error) {
-        messageDiv.textContent = '❌ Error de conexión con el servidor';
-        messageDiv.className = 'message error';
-        console.error('Error registrando cobro:', error);
     }
 });
 
@@ -281,12 +386,6 @@ document.getElementById('logoutBtn').addEventListener('click', () => {
     currentUser = null;
     showLogin();
 });
-
-// ============================================
-// EVENTOS: ACTUALIZAR DATOS
-// ============================================
-document.getElementById('refreshStats').addEventListener('click', loadStats);
-document.getElementById('refreshCobros').addEventListener('click', loadCobros);
 
 // ============================================
 // INICIAR APLICACIÓN

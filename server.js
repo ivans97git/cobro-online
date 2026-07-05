@@ -18,35 +18,25 @@ const PORT = process.env.PORT || 3000;
 let db;
 
 // ============================================
-// 🔥 CONFIGURACIÓN DE PROXY (NUEVO)
-// ============================================
-// Confiar en el proxy de Railway
-app.set('trust proxy', true);
-
-// ============================================
 // 3. MIDDLEWARE
 // ============================================
 app.use(express.json());
 app.use(cors());
 app.use(express.static('frontend'));
 
-// ============================================
-// 4. RATE LIMITING (con configuración mejorada)
-// ============================================
+// Rate limiting
 const limiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutos
     max: 100, // máximo 100 peticiones por IP
-    standardHeaders: true, // Devuelve cabeceras de límite en la respuesta
-    legacyHeaders: false, // Desactiva las cabeceras antiguas
-    // 🔥 Configuración para proxies
-    trustProxy: true, // Confía en el proxy para obtener la IP real
+    standardHeaders: true,
+    legacyHeaders: false,
+    trustProxy: true,
     keyGenerator: (req) => {
-        // Usar la IP real del cliente (de Railway)
         return req.ip || req.connection.remoteAddress;
     }
 });
-
 app.use('/api/', limiter);
+
 // ============================================
 // 4. BASE DE DATOS SQLITE
 // ============================================
@@ -90,91 +80,54 @@ async function initDatabase() {
     `);
     console.log('✅ Tabla "cobros" creada/verificada');
 
-    // Insertar 6 usuarios de prueba
+    // ============================================
+    // 🔥 NUEVOS USUARIOS - CREDENCIALES ACTUALIZADAS
+    // ============================================
     const existe = await db.get('SELECT COUNT(*) as count FROM usuarios');
     
     if (existe.count === 0) {
-        console.log('👤 Creando usuarios de prueba...');
+        console.log('👤 Creando nuevos usuarios de prueba...');
         
-        await db.run(`
-            INSERT INTO usuarios (nombre, email, password, codigo_cobrador) VALUES
-            ('Carlos Pérez', 'carlos@cobro.com', '$2a$10$9C5VqZqZqZqZqZqZqZqZqO', 'CBR001'),
-            ('María Gómez', 'maria@cobro.com', '$2a$10$9C5VqZqZqZqZqZqZqZqZqO', 'CBR002'),
-            ('Juan Rodríguez', 'juan@cobro.com', '$2a$10$9C5VqZqZqZqZqZqZqZqZqO', 'CBR003'),
-            ('Ana Martínez', 'ana@cobro.com', '$2a$10$9C5VqZqZqZqZqZqZqZqZqO', 'CBR004'),
-            ('Luis Sánchez', 'luis@cobro.com', '$2a$10$9C5VqZqZqZqZqZqZqZqZqO', 'CBR005'),
-            ('Elena Torres', 'elena@cobro.com', '$2a$10$9C5VqZqZqZqZqZqZqZqZqO', 'CBR006')
-        `);
-        console.log('✅ 6 usuarios de prueba creados');
+        // Datos de los nuevos usuarios
+        const nuevosUsuarios = [
+            { nombre: 'Pablo Vazquez', codigo: 'Pablo', password: 'pablo2503' },
+            { nombre: 'Patricia Britez', codigo: 'Pato', password: 'pato2026' },
+            { nombre: 'Andres Segovia', codigo: 'ivan', password: 'ivan26' },
+            { nombre: 'Alcides Saavedra', codigo: 'Alcides', password: 'alcides26' },
+            { nombre: 'Esteban Britez', codigo: 'capeli', password: 'capeli26' }
+        ];
+
+        for (const usuario of nuevosUsuarios) {
+            const hash = await bcrypt.hash(usuario.password, 10);
+            await db.run(`
+                INSERT INTO usuarios (nombre, email, password, codigo_cobrador) 
+                VALUES (?, ?, ?, ?)
+            `, [
+                usuario.nombre,
+                `${usuario.codigo.toLowerCase()}@cobro.com`,
+                hash,
+                usuario.codigo
+            ]);
+            console.log(`   ✅ Creado: ${usuario.nombre} (${usuario.codigo})`);
+        }
+        console.log('✅ 5 nuevos usuarios creados correctamente');
+    } else {
+        console.log(`✅ Usuarios ya existen (${existe.count})`);
+        // Mostrar usuarios existentes
+        const usuarios = await db.all('SELECT codigo_cobrador, nombre FROM usuarios');
+        console.log('📊 Usuarios en la base de datos:');
+        usuarios.forEach(u => console.log(`   ${u.codigo_cobrador}: ${u.nombre}`));
     }
 
     console.log('✅ Base de datos lista');
     return db;
 }
 
+// Pasar db a las rutas
 app.use((req, res, next) => {
     req.db = db;
     next();
 });
-
-// ============================================
-// 🔥 FUNCIÓN PARA FORZAR USUARIOS (NUEVO)
-// ============================================
-async function forceCreateUsers() {
-    try {
-        console.log('🔍 Verificando usuarios en la base de datos...');
-        
-        // Verificar si la tabla existe
-        const tableExists = await db.get(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name='usuarios'"
-        );
-        
-        if (!tableExists) {
-            console.log('❌ Tabla "usuarios" no encontrada. Creando...');
-            await db.exec(`
-                CREATE TABLE IF NOT EXISTS usuarios (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    nombre TEXT NOT NULL,
-                    email TEXT UNIQUE NOT NULL,
-                    password TEXT NOT NULL,
-                    codigo_cobrador TEXT UNIQUE NOT NULL,
-                    activo INTEGER DEFAULT 1,
-                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-                )
-            `);
-        }
-
-        // Verificar si hay usuarios
-        const count = await db.get('SELECT COUNT(*) as count FROM usuarios');
-        console.log(`📊 Usuarios en la base de datos: ${count.count}`);
-
-        if (count.count === 0) {
-            console.log('👤 Creando usuarios de prueba...');
-            await db.run(`
-                INSERT INTO usuarios (nombre, email, password, codigo_cobrador) VALUES
-                ('Carlos Pérez', 'carlos@cobro.com', '$2a$10$9C5VqZqZqZqZqZqZqZqZqO', 'CBR001'),
-                ('María Gómez', 'maria@cobro.com', '$2a$10$9C5VqZqZqZqZqZqZqZqZqO', 'CBR002'),
-                ('Juan Rodríguez', 'juan@cobro.com', '$2a$10$9C5VqZqZqZqZqZqZqZqZqO', 'CBR003'),
-                ('Ana Martínez', 'ana@cobro.com', '$2a$10$9C5VqZqZqZqZqZqZqZqZqO', 'CBR004'),
-                ('Luis Sánchez', 'luis@cobro.com', '$2a$10$9C5VqZqZqZqZqZqZqZqZqO', 'CBR005'),
-                ('Elena Torres', 'elena@cobro.com', '$2a$10$9C5VqZqZqZqZqZqZqZqZqO', 'CBR006')
-            `);
-            console.log('✅ 6 usuarios de prueba creados');
-            
-            // Verificar que se crearon
-            const usuarios = await db.all('SELECT codigo_cobrador, nombre FROM usuarios');
-            console.log('📊 Usuarios creados:');
-            usuarios.forEach(u => console.log(`   ${u.codigo_cobrador}: ${u.nombre}`));
-        } else {
-            console.log('✅ Usuarios ya existen');
-            const usuarios = await db.all('SELECT codigo_cobrador, nombre FROM usuarios');
-            console.log('📊 Usuarios en la base de datos:');
-            usuarios.forEach(u => console.log(`   ${u.codigo_cobrador}: ${u.nombre}`));
-        }
-    } catch (error) {
-        console.error('❌ Error forzando usuarios:', error.message);
-    }
-}
 
 // ============================================
 // 5. RUTAS DE AUTENTICACIÓN
@@ -185,33 +138,28 @@ app.post('/api/auth/login', async (req, res) => {
     try {
         const { codigo, password } = req.body;
 
-        // 🔥 LOG 1: Ver qué datos llegan
+        // Logs de depuración
         console.log('📥 Datos recibidos:', { codigo, password });
 
         if (!codigo || !password) {
-            console.log('❌ Faltan datos');
             return res.status(400).json({ 
                 error: '❌ Código de cobrador y contraseña son requeridos' 
             });
         }
 
-        // 🔥 LOG 2: Buscar usuario
-        console.log(`🔍 Buscando usuario con código: ${codigo}`);
         const user = await db.get(
             'SELECT * FROM usuarios WHERE codigo_cobrador = ? AND activo = 1',
             [codigo]
         );
 
+        console.log(`🔍 Buscando usuario con código: ${codigo}`);
         if (!user) {
             console.log(`❌ Usuario no encontrado: ${codigo}`);
             return res.status(401).json({ error: '❌ Credenciales inválidas' });
         }
 
         console.log(`✅ Usuario encontrado: ${user.nombre} (${user.codigo_cobrador})`);
-        console.log(`🔑 Hash almacenado: ${user.password.substring(0, 20)}...`);
-
-        // 🔥 LOG 3: Verificar contraseña
-        console.log(`🔐 Comparando contraseña...`);
+        
         const passwordValida = await bcrypt.compare(password, user.password);
         console.log(`📊 Resultado de comparación: ${passwordValida ? '✅ VÁLIDA' : '❌ INVÁLIDA'}`);
 
@@ -466,23 +414,19 @@ app.get('/api/health', (req, res) => {
 // ============================================
 // 9. INICIAR SERVIDOR
 // ============================================
-initDatabase().then(async () => {
-    // 🔥 FORZAR CREACIÓN DE USUARIOS
-    await forceCreateUsers();
-    
+initDatabase().then(() => {
     app.listen(PORT, () => {
         console.log('\n' + '='.repeat(50));
         console.log('🚀 SERVIDOR INICIADO CORRECTAMENTE');
         console.log('='.repeat(50));
         console.log(`📡 Puerto: http://localhost:${PORT}`);
         console.log(`🗄️  Base de datos: SQLite (./database/cobro.db)`);
-        console.log('\n📊 USUARIOS DE PRUEBA:');
-        console.log('   🔑 CBR001 - Carlos Pérez   (contraseña: 123456)');
-        console.log('   🔑 CBR002 - María Gómez    (contraseña: 123456)');
-        console.log('   🔑 CBR003 - Juan Rodríguez (contraseña: 123456)');
-        console.log('   🔑 CBR004 - Ana Martínez   (contraseña: 123456)');
-        console.log('   🔑 CBR005 - Luis Sánchez   (contraseña: 123456)');
-        console.log('   🔑 CBR006 - Elena Torres   (contraseña: 123456)');
+        console.log('\n📊 NUEVOS USUARIOS DE PRUEBA:');
+        console.log('   🔑 Pablo   - Contraseña: pablo2503');
+        console.log('   🔑 Pato    - Contraseña: pato2026');
+        console.log('   🔑 ivan    - Contraseña: ivan26');
+        console.log('   🔑 Alcides - Contraseña: alcides26');
+        console.log('   🔑 capeli  - Contraseña: capeli26');
         console.log('='.repeat(50) + '\n');
     });
 }).catch(err => {

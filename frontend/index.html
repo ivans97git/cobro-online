@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Cobro Online</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="app">
+        <!-- ==================== LOGIN ==================== -->
+        <div id="loginSection" class="container">
+            <div class="login-box">
+                <div class="logo">
+                    <span class="icon">💰</span>
+                    <h1>Sistema de Cobro</h1>
+                </div>
+                <h2>Iniciar Sesión</h2>
+                
+                <form id="loginForm">
+                    <div class="form-group">
+                        <label>📋 Código de Cobrador</label>
+                        <input type="text" id="codigo" placeholder="Ej: CBR001" required>
+                    </div>
+                    <div class="form-group">
+                        <label>🔒 Contraseña</label>
+                        <input type="password" id="password" placeholder="••••••••" required>
+                    </div>
+                    <button type="submit" class="btn-primary">Ingresar</button>
+                    <div id="loginError" class="error-message"></div>
+                </form>
+                
+                <div class="info-help">
+                    <p><strong>Usuarios de prueba:</strong> CBR001 - CBR006</p>
+                    <p><strong>Contraseña:</strong> 123456</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==================== DASHBOARD ==================== -->
+        <div id="dashboardSection" class="container" style="display:none">
+            <!-- Header -->
+            <div class="dashboard-header">
+                <div class="header-left">
+                    <h1>💰 Sistema de Cobro</h1>
+                </div>
+                <div class="header-right">
+                    <span class="user-name" id="userName">👤 Usuario</span>
+                    <span class="badge" id="userCode">CBR000</span>
+                    <button id="logoutBtn" class="btn-logout">Cerrar Sesión</button>
+                </div>
+            </div>
+
+            <!-- Grid de 2 columnas -->
+            <div class="dashboard-grid">
+                <!-- Columna 1: Registrar Cobro -->
+                <div class="card">
+                    <h3>📝 Registrar Cobro</h3>
+                    <form id="cobroForm">
+                        <div class="form-group">
+                            <label>Nombre del Cliente *</label>
+                            <input type="text" id="clienteNombre" placeholder="Ej: Juan Pérez" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Cédula/RUC</label>
+                            <input type="text" id="clienteCedula" placeholder="Ej: 12345678">
+                        </div>
+                        <div class="form-group">
+                            <label>Monto (Bs/$) *</label>
+                            <input type="number" id="monto" step="0.01" placeholder="0.00" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Concepto</label>
+                            <input type="text" id="concepto" placeholder="Ej: Pago de servicio">
+                        </div>
+                        <div class="form-group">
+                            <label>Método de Pago *</label>
+                            <select id="metodoPago" required>
+                                <option value="efectivo">💵 Efectivo</option>
+                                <option value="transferencia">🏦 Transferencia</option>
+                                <option value="tarjeta">💳 Tarjeta</option>
+                                <option value="pago_movil">📱 Pago Móvil</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Referencia</label>
+                            <input type="text" id="referencia" placeholder="Número de referencia">
+                        </div>
+                        <button type="submit" class="btn-success">✅ Registrar Cobro</button>
+                        <div id="cobroMessage" class="message"></div>
+                    </form>
+                </div>
+
+                <!-- Columna 2: Estadísticas -->
+                <div class="card">
+                    <h3>📊 Estadísticas</h3>
+                    <div id="statsContainer">
+                        <div class="stat-item">
+                            <span class="stat-label">📋 Total Cobros:</span>
+                            <span id="totalCobros" class="stat-value">0</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">💰 Monto Total:</span>
+                            <span id="montoTotal" class="stat-value">$0.00</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">📊 Promedio:</span>
+                            <span id="promedio" class="stat-value">$0.00</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">👥 Clientes Únicos:</span>
+                            <span id="clientesUnicos" class="stat-value">0</span>
+                        </div>
+                        <div id="metodosPago" style="margin-top:15px;">
+                            <h4>Por método de pago:</h4>
+                            <div id="metodosDetalle"></div>
+                        </div>
+                    </div>
+                    <button id="refreshStats" class="btn-secondary">🔄 Actualizar</button>
+                </div>
+            </div>
+
+            <!-- Tabla de Historial -->
+            <div class="card full-width">
+                <div class="card-header">
+                    <h3>📋 Historial de Cobros</h3>
+                    <button id="refreshCobros" class="btn-secondary small">🔄 Actualizar</button>
+                </div>
+                <div id="cobrosList">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>📅 Fecha</th>
+                                <th>👤 Cliente</th>
+                                <th>💰 Monto</th>
+                                <th>💳 Método</th>
+                                <th>📝 Concepto</th>
+                                <th>📌 Estado</th>
+                            </tr>
+                        </thead>
+                        <tbody id="cobrosTableBody">
+                            <tr><td colspan="6" style="text-align:center;">Cargando cobros...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

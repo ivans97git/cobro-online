@@ -1,0 +1,13 @@
+
+---
+
+## 📄 ARCHIVO 5: `.env.example`
+
+**Ubicación:** `cobro-online/.env.example`
+
+```env
+# Puerto del servidor
+PORT=3000
+
+# Clave secreta para JWT (cambiar en producción)
+JWT_SECRET=mi_clave_secreta_temporal

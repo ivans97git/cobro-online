@@ -18,18 +18,35 @@ const PORT = process.env.PORT || 3000;
 let db;
 
 // ============================================
+// 🔥 CONFIGURACIÓN DE PROXY (NUEVO)
+// ============================================
+// Confiar en el proxy de Railway
+app.set('trust proxy', true);
+
+// ============================================
 // 3. MIDDLEWARE
 // ============================================
 app.use(express.json());
 app.use(cors());
 app.use(express.static('frontend'));
 
+// ============================================
+// 4. RATE LIMITING (con configuración mejorada)
+// ============================================
 const limiter = rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: 100
+    windowMs: 15 * 60 * 1000, // 15 minutos
+    max: 100, // máximo 100 peticiones por IP
+    standardHeaders: true, // Devuelve cabeceras de límite en la respuesta
+    legacyHeaders: false, // Desactiva las cabeceras antiguas
+    // 🔥 Configuración para proxies
+    trustProxy: true, // Confía en el proxy para obtener la IP real
+    keyGenerator: (req) => {
+        // Usar la IP real del cliente (de Railway)
+        return req.ip || req.connection.remoteAddress;
+    }
 });
-app.use('/api/', limiter);
 
+app.use('/api/', limiter);
 // ============================================
 // 4. BASE DE DATOS SQLITE
 // ============================================

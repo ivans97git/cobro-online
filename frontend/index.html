@@ -54,7 +54,7 @@
                 <button class="nav-tab" data-tab="planes">📡 Planes</button>
             </div>
 
-            <!-- TAB: CLIENTES (CON BUSCADOR E HISTORIAL) -->
+            <!-- TAB: CLIENTES -->
             <div id="tab-clientes" class="tab-content active">
                 <div class="card">
                     <div class="card-header">
@@ -86,7 +86,7 @@
                     </div>
                 </div>
                 
-                <!-- Panel de Detalle del Cliente (Historial de Pagos) -->
+                <!-- Panel de Detalle del Cliente -->
                 <div id="detalleCliente" class="card" style="display:none;">
                     <div class="card-header">
                         <h3 id="detalleClienteNombre">📋 Historial de Pagos</h3>
@@ -195,14 +195,16 @@
             <!-- TAB: PLANES -->
             <div id="tab-planes" class="tab-content">
                 <div class="card">
-                    <h3>📡 Planes de Internet</h3>
+                    <div class="card-header">
+                        <h3>📡 Planes de Internet</h3>
+                    </div>
                     <div id="planesList">
                         <table>
                             <thead>
                                 <tr>
                                     <th>Nombre</th>
                                     <th>Velocidad</th>
-                                    <th>Precio</th>
+                                    <th>Precio (Gs)</th>
                                     <th>Descripción</th>
                                 </tr>
                             </thead>

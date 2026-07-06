@@ -75,7 +75,7 @@ async function initDatabase() {
     `);
     console.log('✅ Tabla "planes" creada/verificada');
 
-    // --- CLIENTES (CON DNI/CÉDULA) ---
+    // --- CLIENTES ---
     await db.exec(`
         CREATE TABLE IF NOT EXISTS clientes (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -132,18 +132,19 @@ async function initDatabase() {
     // DATOS INICIALES
     // ============================================
     
-    // 1. PLANES POR DEFECTO
+    // 1. PLANES POR DEFECTO (ACTUALIZADOS)
     const planesExisten = await db.get('SELECT COUNT(*) as count FROM planes');
     if (planesExisten.count === 0) {
         console.log('📡 Creando planes de internet...');
         await db.run(`
             INSERT INTO planes (nombre, velocidad, precio, descripcion) VALUES
-            ('Básico', '10 Mbps', 15000, 'Plan básico para navegación'),
-            ('Estándar', '20 Mbps', 25000, 'Plan estándar para streaming'),
-            ('Premium', '50 Mbps', 35000, 'Plan premium para gaming y 4K'),
-            ('Empresarial', '100 Mbps', 50000, 'Plan empresarial con prioridad')
+            ('SIMPLE', '10 Mbps', 27000, 'Plan básico para navegación'),
+            ('FAMILIAR X2', '20 Mbps', 40000, 'Plan para 2 dispositivos en simultáneo'),
+            ('FAMILIAR X3', '30 Mbps', 60000, 'Plan para 3 dispositivos en simultáneo'),
+            ('FAMILIAR X4', '40 Mbps', 80000, 'Plan para 4 dispositivos en simultáneo'),
+            ('FAMILIAR X5', '50 Mbps', 100000, 'Plan para 5 dispositivos en simultáneo')
         `);
-        console.log('✅ Planes creados');
+        console.log('✅ Planes creados: SIMPLE, FAMILIAR X2, X3, X4, X5');
     }
 
     // 2. USUARIOS COBRADORES
@@ -210,7 +211,6 @@ Hola *${cliente.nombre}*,
 
 async function enviarWhatsApp(telefono, mensaje) {
     try {
-        // Configuración de Twilio (reemplazar con tus credenciales)
         const accountSid = process.env.TWILIO_ACCOUNT_SID || 'tu_account_sid';
         const authToken = process.env.TWILIO_AUTH_TOKEN || 'tu_auth_token';
         const twilioPhone = process.env.TWILIO_PHONE || '+1234567890';
@@ -371,7 +371,6 @@ app.get('/api/clientes/buscar', authMiddleware, async (req, res) => {
 
         const searchTerm = `%${termino.trim()}%`;
         
-        // Buscar clientes
         const clientes = await db.all(`
             SELECT 
                 c.*, 
@@ -391,7 +390,6 @@ app.get('/api/clientes/buscar', authMiddleware, async (req, res) => {
             ORDER BY c.nombre
         `, [searchTerm, searchTerm, searchTerm, searchTerm, searchTerm]);
 
-        // Para cada cliente, obtener su historial de pagos
         for (const cliente of clientes) {
             const pagos = await db.all(`
                 SELECT 
@@ -405,14 +403,12 @@ app.get('/api/clientes/buscar', authMiddleware, async (req, res) => {
             
             cliente.historial_pagos = pagos;
             
-            // Calcular deuda actual
             const mesActual = new Date().getMonth() + 1;
             const anioActual = new Date().getFullYear();
             
             const pagosRecientes = pagos.filter(p => p.anio === anioActual && p.mes === mesActual);
             cliente.pago_mes_actual = pagosRecientes.length > 0;
             
-            // Contar meses de deuda
             const mesesPagados = pagos.map(p => `${p.anio}-${p.mes}`);
             let mesesDeuda = [];
             
@@ -445,7 +441,7 @@ app.get('/api/clientes/buscar', authMiddleware, async (req, res) => {
     }
 });
 
-// OBTENER DETALLE COMPLETO DE UN CLIENTE (CON HISTORIAL)
+// OBTENER DETALLE COMPLETO DE UN CLIENTE
 app.get('/api/clientes/:id', authMiddleware, async (req, res) => {
     try {
         const clienteId = req.params.id;
@@ -461,7 +457,6 @@ app.get('/api/clientes/:id', authMiddleware, async (req, res) => {
             return res.status(404).json({ error: '❌ Cliente no encontrado' });
         }
 
-        // Obtener historial de pagos
         const pagos = await db.all(`
             SELECT 
                 p.*,
@@ -474,7 +469,6 @@ app.get('/api/clientes/:id', authMiddleware, async (req, res) => {
         
         cliente.historial_pagos = pagos;
         
-        // Resumen de pagos
         const totalPagado = pagos.reduce((sum, p) => sum + p.monto, 0);
         cliente.total_pagado = totalPagado;
         cliente.total_pagos = pagos.length;
@@ -537,6 +531,8 @@ app.post('/api/clientes', authMiddleware, async (req, res) => {
 // ============================================
 // 9. RUTAS DE PLANES
 // ============================================
+
+// OBTENER TODOS LOS PLANES
 app.get('/api/planes', authMiddleware, async (req, res) => {
     try {
         const planes = await db.all('SELECT * FROM planes WHERE activo = 1 ORDER BY precio');
@@ -778,6 +774,12 @@ initDatabase().then(() => {
         console.log('='.repeat(50));
         console.log(`📡 Puerto: http://localhost:${PORT}`);
         console.log(`🗄️  Base de datos: SQLite (./database/internet.db)`);
+        console.log('\n📡 PLANES DE INTERNET:');
+        console.log('   📶 SIMPLE        - 27.000 Gs');
+        console.log('   📶 FAMILIAR X2   - 40.000 Gs');
+        console.log('   📶 FAMILIAR X3   - 60.000 Gs');
+        console.log('   📶 FAMILIAR X4   - 80.000 Gs');
+        console.log('   📶 FAMILIAR X5   - 100.000 Gs');
         console.log('\n📊 CREDENCIALES DE ACCESO:');
         console.log('   🔑 Pablo   - Contraseña: pablo2503');
         console.log('   🔑 Pato    - Contraseña: pato2026');

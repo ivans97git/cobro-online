@@ -260,7 +260,7 @@ async function loadPlanes() {
                 <tr>
                     <td><strong>${p.nombre}</strong></td>
                     <td>${p.velocidad}</td>
-                    <td>$${p.precio.toLocaleString()}</td>
+                    <td>${p.precio.toLocaleString()} Gs</td>
                     <td>${p.descripcion || '-'}</td>
                 </tr>
             `).join('');
@@ -346,7 +346,7 @@ async function cargarPlanesEnSelect() {
             
             select.innerHTML = '<option value="">Seleccionar plan...</option>';
             planes.forEach(p => {
-                select.innerHTML += `<option value="${p.id}">${p.nombre} - ${p.velocidad} ($${p.precio.toLocaleString()})</option>`;
+                select.innerHTML += `<option value="${p.id}">${p.nombre} - ${p.velocidad} (${p.precio.toLocaleString()} Gs)</option>`;
             });
         }
     } catch (error) {
@@ -586,7 +586,7 @@ document.getElementById('buscarCliente').addEventListener('keypress', (e) => {
     }
 });
 
-// Búsqueda en tiempo real (opcional)
+// Búsqueda en tiempo real (opcional - descomentar para activar)
 // let timeoutId;
 // document.getElementById('buscarCliente').addEventListener('input', (e) => {
 //     clearTimeout(timeoutId);

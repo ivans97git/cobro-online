@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistema de Gestión de Internet</title>
+    <title>Gestión de Internet - Cobros</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -54,28 +54,63 @@
                 <button class="nav-tab" data-tab="planes">📡 Planes</button>
             </div>
 
-            <!-- TAB: CLIENTES -->
+            <!-- TAB: CLIENTES (CON BUSCADOR E HISTORIAL) -->
             <div id="tab-clientes" class="tab-content active">
                 <div class="card">
                     <div class="card-header">
                         <h3>👥 Clientes</h3>
-                        <button id="btnNuevoCliente" class="btn-success">+ Nuevo Cliente</button>
+                        <div class="search-container">
+                            <input type="text" id="buscarCliente" placeholder="🔍 Buscar por nombre, cédula, teléfono..." class="search-input">
+                            <button id="btnBuscar" class="btn-search">Buscar</button>
+                            <button id="btnLimpiar" class="btn-secondary">Limpiar</button>
+                            <button id="btnNuevoCliente" class="btn-success">+ Nuevo Cliente</button>
+                        </div>
                     </div>
                     <div id="clientesList">
+                        <div id="resultadosBusqueda" style="margin-bottom:10px; color:#6b7280; font-size:14px;"></div>
                         <table>
                             <thead>
                                 <tr>
                                     <th>Nombre</th>
+                                    <th>Cédula</th>
                                     <th>Teléfono</th>
                                     <th>Plan</th>
-                                    <th>Instalación</th>
                                     <th>Estado</th>
+                                    <th>Acción</th>
                                 </tr>
                             </thead>
                             <tbody id="clientesTableBody">
-                                <tr><td colspan="5" style="text-align:center;">Cargando clientes...</td></tr>
+                                <tr><td colspan="6" style="text-align:center;">Cargando clientes...</td></tr>
                             </tbody>
                         </table>
+                    </div>
+                </div>
+                
+                <!-- Panel de Detalle del Cliente (Historial de Pagos) -->
+                <div id="detalleCliente" class="card" style="display:none;">
+                    <div class="card-header">
+                        <h3 id="detalleClienteNombre">📋 Historial de Pagos</h3>
+                        <button id="btnCerrarDetalle" class="btn-secondary">Cerrar</button>
+                    </div>
+                    <div id="detalleContenido">
+                        <div id="infoCliente" style="margin-bottom:15px; padding:15px; background:#f9fafb; border-radius:8px;"></div>
+                        <div id="historialPagos">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Mes/Año</th>
+                                        <th>Monto</th>
+                                        <th>Método</th>
+                                        <th>Cobrador</th>
+                                        <th>Fecha</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="historialTableBody">
+                                    <tr><td colspan="5" style="text-align:center;">No hay pagos registrados</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div id="resumenPagos" style="margin-top:15px; padding:15px; background:#f0f4ff; border-radius:8px;"></div>
                     </div>
                 </div>
             </div>
@@ -141,6 +176,7 @@
                             <thead>
                                 <tr>
                                     <th>Cliente</th>
+                                    <th>Cédula</th>
                                     <th>Teléfono</th>
                                     <th>Plan</th>
                                     <th>Meses Deuda</th>
@@ -149,7 +185,7 @@
                                 </tr>
                             </thead>
                             <tbody id="morososTableBody">
-                                <tr><td colspan="6" style="text-align:center;">Cargando morosos...</td></tr>
+                                <tr><td colspan="7" style="text-align:center;">Cargando morosos...</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -177,6 +213,46 @@
                     </div>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <!-- MODAL PARA NUEVO CLIENTE -->
+    <div id="modalCliente" class="modal" style="display:none;">
+        <div class="modal-content">
+            <span class="close" id="closeModal">&times;</span>
+            <h3>📝 Nuevo Cliente</h3>
+            <form id="clienteForm">
+                <div class="form-group">
+                    <label>Nombre *</label>
+                    <input type="text" id="clienteNombre" required>
+                </div>
+                <div class="form-group">
+                    <label>Cédula/DNI</label>
+                    <input type="text" id="clienteCedula" placeholder="Ej: 12345678">
+                </div>
+                <div class="form-group">
+                    <label>Teléfono *</label>
+                    <input type="text" id="clienteTelefono" required>
+                </div>
+                <div class="form-group">
+                    <label>Dirección</label>
+                    <input type="text" id="clienteDireccion">
+                </div>
+                <div class="form-group">
+                    <label>Email</label>
+                    <input type="email" id="clienteEmail">
+                </div>
+                <div class="form-group">
+                    <label>Plan *</label>
+                    <select id="clientePlan" required></select>
+                </div>
+                <div class="form-group">
+                    <label>Fecha de Instalación</label>
+                    <input type="date" id="clienteFechaInstalacion">
+                </div>
+                <button type="submit" class="btn-success">✅ Guardar Cliente</button>
+                <div id="clienteMessage" class="message"></div>
+            </form>
         </div>
     </div>
 

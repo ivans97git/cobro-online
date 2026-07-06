@@ -30,6 +30,7 @@ async function checkAuth() {
                 loadMorosos()
             ]);
             await cargarClientesEnSelect();
+            await cargarPlanesEnSelect();
         } else {
             localStorage.removeItem('token');
             token = null;
@@ -46,16 +47,16 @@ async function checkAuth() {
 // ============================================
 document.querySelectorAll('.nav-tab').forEach(tab => {
     tab.addEventListener('click', function() {
-        // Cambiar tab activa
         document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
         this.classList.add('active');
         
-        // Cambiar contenido
         const tabName = this.dataset.tab;
         document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
         document.getElementById(`tab-${tabName}`).classList.add('active');
         
-        // Cargar datos según tab
+        // Ocultar detalle de cliente al cambiar de tab
+        document.getElementById('detalleCliente').style.display = 'none';
+        
         if (tabName === 'clientes') loadClientes();
         if (tabName === 'morosos') loadMorosos();
         if (tabName === 'planes') loadPlanes();
@@ -90,24 +91,150 @@ async function loadClientes() {
         if (response.ok) {
             const clientes = await response.json();
             const tbody = document.getElementById('clientesTableBody');
+            document.getElementById('resultadosBusqueda').textContent = `📋 Total: ${clientes.length} clientes`;
             
             if (clientes.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;">No hay clientes registrados</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">No hay clientes registrados</td></tr>';
                 return;
             }
 
             tbody.innerHTML = clientes.map(c => `
                 <tr>
                     <td><strong>${c.nombre}</strong></td>
+                    <td>${c.cedula || '-'}</td>
                     <td>${c.telefono}</td>
                     <td>${c.plan_nombre || 'Sin plan'} (${c.velocidad || ''})</td>
-                    <td>${c.fecha_instalacion || '-'}</td>
                     <td><span class="badge" style="background:${c.activo ? '#10b981' : '#ef4444'}">${c.activo ? 'Activo' : 'Inactivo'}</span></td>
+                    <td><button class="btn-search" onclick="verDetalleCliente(${c.id})">📋 Ver Historial</button></td>
                 </tr>
             `).join('');
         }
     } catch (error) {
         console.error('Error cargando clientes:', error);
+    }
+}
+
+// ============================================
+// BUSCAR CLIENTES
+// ============================================
+async function buscarClientes(termino) {
+    try {
+        if (!termino || termino.trim() === '') {
+            document.getElementById('resultadosBusqueda').textContent = '';
+            return loadClientes();
+        }
+
+        const response = await fetch(`${API_URL}/api/clientes/buscar?termino=${encodeURIComponent(termino)}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (response.ok) {
+            const data = await response.json();
+            const tbody = document.getElementById('clientesTableBody');
+            
+            document.getElementById('resultadosBusqueda').textContent = 
+                `🔍 ${data.count} resultados encontrados para "${termino}"`;
+
+            if (data.count === 0) {
+                tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;">No se encontraron clientes para "${termino}"</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = data.clientes.map(c => `
+                <tr>
+                    <td><strong>${c.nombre}</strong></td>
+                    <td>${c.cedula || '-'}</td>
+                    <td>${c.telefono}</td>
+                    <td>${c.plan_nombre || 'Sin plan'} (${c.velocidad || ''})</td>
+                    <td><span class="badge" style="background:${c.activo ? '#10b981' : '#ef4444'}">${c.activo ? 'Activo' : 'Inactivo'}</span></td>
+                    <td><button class="btn-search" onclick="verDetalleCliente(${c.id})">📋 Ver Historial</button></td>
+                </tr>
+            `).join('');
+        }
+    } catch (error) {
+        console.error('Error buscando clientes:', error);
+        document.getElementById('resultadosBusqueda').textContent = '❌ Error en la búsqueda';
+    }
+}
+
+// ============================================
+// LIMPIAR BÚSQUEDA
+// ============================================
+function limpiarBusqueda() {
+    document.getElementById('buscarCliente').value = '';
+    document.getElementById('resultadosBusqueda').textContent = '';
+    loadClientes();
+}
+
+// ============================================
+// VER DETALLE DE CLIENTE (CON HISTORIAL DE PAGOS)
+// ============================================
+async function verDetalleCliente(clienteId) {
+    try {
+        const response = await fetch(`${API_URL}/api/clientes/${clienteId}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (response.ok) {
+            const cliente = await response.json();
+            
+            // Mostrar panel de detalle
+            const detalleDiv = document.getElementById('detalleCliente');
+            detalleDiv.style.display = 'block';
+            
+            // Información del cliente
+            document.getElementById('detalleClienteNombre').textContent = `📋 Historial de Pagos - ${cliente.nombre}`;
+            
+            document.getElementById('infoCliente').innerHTML = `
+                <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:10px;">
+                    <div><strong>Nombre:</strong> ${cliente.nombre}</div>
+                    <div><strong>Cédula:</strong> ${cliente.cedula || '-'}</div>
+                    <div><strong>Teléfono:</strong> ${cliente.telefono}</div>
+                    <div><strong>Plan:</strong> ${cliente.plan_nombre || 'Sin plan'} (${cliente.velocidad || ''})</div>
+                    <div><strong>Instalación:</strong> ${cliente.fecha_instalacion || '-'}</div>
+                    <div><strong>Estado:</strong> <span class="badge" style="background:${cliente.activo ? '#10b981' : '#ef4444'}">${cliente.activo ? 'Activo' : 'Inactivo'}</span></div>
+                </div>
+            `;
+            
+            // Historial de pagos
+            const historialBody = document.getElementById('historialTableBody');
+            const pagos = cliente.historial_pagos || [];
+            
+            if (pagos.length === 0) {
+                historialBody.innerHTML = '<tr><td colspan="5" style="text-align:center;">No hay pagos registrados para este cliente</td></tr>';
+            } else {
+                const meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+                historialBody.innerHTML = pagos.map(p => `
+                    <tr>
+                        <td>${meses[p.mes - 1]} ${p.anio}</td>
+                        <td>$${p.monto.toLocaleString()}</td>
+                        <td>${p.metodo_pago}</td>
+                        <td>${p.cobrador_nombre || 'Desconocido'}</td>
+                        <td>${new Date(p.fecha_pago).toLocaleDateString()}</td>
+                    </tr>
+                `).join('');
+            }
+            
+            // Resumen de pagos
+            const totalPagado = cliente.total_pagado || 0;
+            const totalPagos = cliente.total_pagos || 0;
+            const deuda = cliente.total_deuda || 0;
+            
+            document.getElementById('resumenPagos').innerHTML = `
+                <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap:10px;">
+                    <div><strong>💰 Total Pagado:</strong> $${totalPagado.toLocaleString()}</div>
+                    <div><strong>📋 Total Pagos:</strong> ${totalPagos}</div>
+                    <div><strong>⚠️ Deuda Pendiente:</strong> $${deuda.toLocaleString()}</div>
+                    <div><strong>📊 Meses al día:</strong> ${cliente.pago_mes_actual ? '✅ Sí' : '❌ No'}</div>
+                </div>
+            `;
+            
+            // Scroll al detalle
+            detalleDiv.scrollIntoView({ behavior: 'smooth' });
+        }
+    } catch (error) {
+        console.error('Error obteniendo detalle del cliente:', error);
+        alert('❌ Error al cargar el historial del cliente');
     }
 }
 
@@ -157,19 +284,21 @@ async function loadMorosos() {
             const tbody = document.getElementById('morososTableBody');
             
             if (morosos.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">🎉 No hay clientes morosos</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;">🎉 No hay clientes morosos</td></tr>';
                 return;
             }
 
             tbody.innerHTML = morosos.map(m => `
                 <tr>
                     <td><strong>${m.nombre}</strong></td>
+                    <td>${m.cedula || '-'}</td>
                     <td>${m.telefono}</td>
                     <td>${m.plan_nombre || 'Sin plan'}</td>
                     <td>${m.meses_deuda?.length || 0} meses</td>
                     <td>$${m.total_deuda?.toLocaleString() || 0}</td>
                     <td>
                         <button class="btn-whatsapp" onclick="enviarWhatsApp(${m.id})">📱 WhatsApp</button>
+                        <button class="btn-search" onclick="verDetalleCliente(${m.id})">📋 Historial</button>
                     </td>
                 </tr>
             `).join('');
@@ -194,11 +323,34 @@ async function cargarClientesEnSelect() {
             
             select.innerHTML = '<option value="">Seleccionar cliente...</option>';
             clientes.forEach(c => {
-                select.innerHTML += `<option value="${c.id}">${c.nombre} - ${c.plan_nombre || 'Sin plan'}</option>`;
+                select.innerHTML += `<option value="${c.id}">${c.nombre} - ${c.cedula || 'Sin cédula'} (${c.plan_nombre || 'Sin plan'})</option>`;
             });
         }
     } catch (error) {
         console.error('Error cargando clientes en select:', error);
+    }
+}
+
+// ============================================
+// CARGAR PLANES EN SELECT
+// ============================================
+async function cargarPlanesEnSelect() {
+    try {
+        const response = await fetch(`${API_URL}/api/planes`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (response.ok) {
+            const planes = await response.json();
+            const select = document.getElementById('clientePlan');
+            
+            select.innerHTML = '<option value="">Seleccionar plan...</option>';
+            planes.forEach(p => {
+                select.innerHTML += `<option value="${p.id}">${p.nombre} - ${p.velocidad} ($${p.precio.toLocaleString()})</option>`;
+            });
+        }
+    } catch (error) {
+        console.error('Error cargando planes en select:', error);
     }
 }
 
@@ -252,8 +404,12 @@ document.getElementById('pagoForm').addEventListener('submit', async (e) => {
         messageDiv.className = 'message success';
         
         document.getElementById('pagoForm').reset();
+        document.getElementById('anioPago').value = '2025';
+        
+        // Recargar datos
         await loadMorosos();
         await loadClientes();
+        await cargarClientesEnSelect();
 
         setTimeout(() => {
             messageDiv.textContent = '';
@@ -264,6 +420,81 @@ document.getElementById('pagoForm').addEventListener('submit', async (e) => {
         messageDiv.textContent = '❌ Error de conexión con el servidor';
         messageDiv.className = 'message error';
         console.error('Error registrando pago:', error);
+    }
+});
+
+// ============================================
+// CREAR NUEVO CLIENTE
+// ============================================
+document.getElementById('btnNuevoCliente').addEventListener('click', () => {
+    document.getElementById('modalCliente').style.display = 'flex';
+    document.getElementById('clienteForm').reset();
+    document.getElementById('clienteMessage').textContent = '';
+    document.getElementById('clienteMessage').className = 'message';
+});
+
+document.getElementById('closeModal').addEventListener('click', () => {
+    document.getElementById('modalCliente').style.display = 'none';
+});
+
+window.addEventListener('click', (e) => {
+    if (e.target === document.getElementById('modalCliente')) {
+        document.getElementById('modalCliente').style.display = 'none';
+    }
+});
+
+document.getElementById('clienteForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const formData = {
+        nombre: document.getElementById('clienteNombre').value.trim(),
+        cedula: document.getElementById('clienteCedula').value.trim(),
+        telefono: document.getElementById('clienteTelefono').value.trim(),
+        direccion: document.getElementById('clienteDireccion').value.trim(),
+        email: document.getElementById('clienteEmail').value.trim(),
+        plan_id: parseInt(document.getElementById('clientePlan').value),
+        fecha_instalacion: document.getElementById('clienteFechaInstalacion').value
+    };
+
+    const messageDiv = document.getElementById('clienteMessage');
+    messageDiv.textContent = '';
+    messageDiv.className = 'message';
+
+    if (!formData.nombre || !formData.telefono || !formData.plan_id) {
+        messageDiv.textContent = '❌ Nombre, teléfono y plan son requeridos';
+        messageDiv.className = 'message error';
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_URL}/api/clientes`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify(formData)
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            messageDiv.textContent = data.error || '❌ Error al crear cliente';
+            messageDiv.className = 'message error';
+            return;
+        }
+
+        messageDiv.textContent = '✅ Cliente creado exitosamente';
+        messageDiv.className = 'message success';
+        
+        document.getElementById('modalCliente').style.display = 'none';
+        await loadClientes();
+        await cargarClientesEnSelect();
+
+    } catch (error) {
+        messageDiv.textContent = '❌ Error de conexión con el servidor';
+        messageDiv.className = 'message error';
+        console.error('Error creando cliente:', error);
     }
 });
 
@@ -333,6 +564,48 @@ document.getElementById('btnEnviarTodos').addEventListener('click', async () => 
 });
 
 // ============================================
+// EVENTOS DEL BUSCADOR
+// ============================================
+document.getElementById('btnBuscar').addEventListener('click', () => {
+    const termino = document.getElementById('buscarCliente').value.trim();
+    if (termino === '') {
+        alert('Por favor, ingrese un término de búsqueda');
+        return;
+    }
+    buscarClientes(termino);
+});
+
+document.getElementById('btnLimpiar').addEventListener('click', limpiarBusqueda);
+
+document.getElementById('buscarCliente').addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+        const termino = document.getElementById('buscarCliente').value.trim();
+        if (termino !== '') {
+            buscarClientes(termino);
+        }
+    }
+});
+
+// Búsqueda en tiempo real (opcional)
+// let timeoutId;
+// document.getElementById('buscarCliente').addEventListener('input', (e) => {
+//     clearTimeout(timeoutId);
+//     const termino = e.target.value.trim();
+//     if (termino === '') {
+//         limpiarBusqueda();
+//         return;
+//     }
+//     timeoutId = setTimeout(() => buscarClientes(termino), 500);
+// });
+
+// ============================================
+// CERRAR DETALLE DE CLIENTE
+// ============================================
+document.getElementById('btnCerrarDetalle').addEventListener('click', () => {
+    document.getElementById('detalleCliente').style.display = 'none';
+});
+
+// ============================================
 // EVENTO: LOGIN
 // ============================================
 document.getElementById('loginForm').addEventListener('submit', async (e) => {
@@ -369,6 +642,7 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
             loadMorosos()
         ]);
         await cargarClientesEnSelect();
+        await cargarPlanesEnSelect();
         document.getElementById('loginForm').reset();
 
     } catch (error) {
